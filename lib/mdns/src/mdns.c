@@ -134,6 +134,10 @@ PacketReceivedFromOLSR(unsigned char *encapsulationUdpData, int len)
        * seem to matter when the destination MAC address is set to all-ones
        * in that case. */
       memset(dest.sll_addr, 0xFF, IFHWADDRLEN);
+      
+      memset(encapsulationUdpData[7], 0x01, 1); /* Setting the encapsulated packet TTL to 1.
+						 * For ipv4 and ipv6 packet the TTL and Hop Limit is in the 8th octet,
+						 * so is not necessary create a condition to check packet type */
 
       nBytesWritten = sendto(walker->capturingSkfd, encapsulationUdpData, stripped_len, 0, (struct sockaddr *)&dest, sizeof(dest));
       if (nBytesWritten != stripped_len) {
