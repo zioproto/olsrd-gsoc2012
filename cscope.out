@@ -1,4 +1,4 @@
-cscope 15 $HOME/olsrd-gsoc2012               0002343433
+cscope 15 /home/alessandro/olsrd-gsoc2012               0002343444
 	@android/arch/syslimits.h
 
 	@android/linux/if_tunnel.h

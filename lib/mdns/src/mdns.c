@@ -391,6 +391,11 @@ BmfPacketCaptured(
   /* Check if the frame is captured on an OLSR-enabled interface */
   //isFromOlsrIntf = (intf->olsrIntf != NULL); TODO: put again this check
 
+  if(encapsulationUdpData[7] <= 0x01)  /* if the TTL or Hop Limit of the packet is 1 or less
+					* discard the packet to avoid mdns packet loop */
+	return;
+
+
   // send the packet to OLSR forward mechanism
   olsr_mdns_gen(encapsulationUdpData, nBytes);
 }                               /* BmfPacketCaptured */
