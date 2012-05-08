@@ -1,4 +1,4 @@
-cscope 15 /home/alessandro/olsrd-gsoc2012               0002343444
+cscope 15 $HOME/olsrd-gsoc2012               0002343471
 	@android/arch/syslimits.h
 
 	@android/linux/if_tunnel.h
@@ -70839,7 +70839,11 @@ de°
 de°P‹t
  != 5353) {
 
-395 
+394 if(
+íˇpsuœti⁄UdpD©a
+[7] <= 0x01)
+
+400 
 	`ﬁ§_mdns_gí
 (
 íˇpsuœti⁄UdpD©a
@@ -70847,11 +70851,11 @@ de°P‹t
 nByãs
 );
 
-396 
+401 
 	}
 }
 
-408 
+413 
 DoMDNS
 (
 skfd
@@ -70865,23 +70869,23 @@ unu£d
 Êags
  __attribute__ ((unused)))
 
-410 
+415 
 	grxBuf„r
 [
 BMF_BUFFER_SIZE
 ];
 
-411 i‡(
+416 i‡(
 	gskfd
  >= 0) {
 
-412 
+417 
 sockaddr_Œ
  
 pktAddr
 ;
 
-413 
+418 
 sockÀn_t
  
 	gaddrLí
@@ -70889,15 +70893,15 @@ sockÀn_t
 pktAddr
 );
 
-414 
+419 
 	gnByãs
 ;
 
-415 *
+420 *
 	gùPackë
 ;
 
-419 
+424 
 	gùPackë
  = 
 GëIpPackë
@@ -70905,7 +70909,7 @@ GëIpPackë
 rxBuf„r
 );
 
-420 
+425 
 	gnByãs
  = 
 ªcv‰om
@@ -70917,7 +70921,7 @@ skfd
 BMF_BUFFER_SIZE
 ,
 
-421 0, (
+426 0, (
 sockaddr
  *)&
 pktAddr
@@ -70925,17 +70929,17 @@ pktAddr
 addrLí
 );
 
-422 i‡(
+427 i‡(
 	gnByãs
  < 0) {
 
-434 i‡(
+439 i‡(
 	gnByãs
  < ()(
 	gù
 )) {
 
-445 i‡(
+450 i‡(
 	gpktAddr
 .
 	g¶l_pkây≥
@@ -70943,7 +70947,7 @@ addrLí
 PACKET_OUTGOING
  ||
 
-446 
+451 
 pktAddr
 .
 ¶l_pkây≥
@@ -70953,7 +70957,7 @@ PACKET_MULTICAST
 PACKET_BROADCAST
 ) {
 
-456 
+461 
 BmfPackëC≠tuªd
 (
 ùPackë
@@ -70961,7 +70965,7 @@ BmfPackëC≠tuªd
 nByãs
 );
 
-463 
+468 
 	$InôMDNS
 (
 öãrÁ˚
@@ -70969,7 +70973,7 @@ nByãs
 skùThisI¡f
 )
 
-468 
+473 
 	`ﬁ§_∑r£r_add_fun˘i⁄
 (&
 ﬁ§_∑r£r
@@ -70977,25 +70981,25 @@ skùThisI¡f
 PARSER_TYPE
 );
 
-470 
+475 
 	`Cª©eBmfNëw‹kI¡îÁ˚s
 (
 skùThisI¡f
 );
 
-473 
+478 
 	}
 }
 
-484 
+489 
 	$Clo£MDNS
 ()
 
-486 
+491 
 	`Clo£BmfNëw‹kI¡îÁ˚s
 ();
 
-487 
+492 
 	}
 }
 
@@ -225705,11 +225709,11 @@ queue_h«
 
 2 c⁄° 
 	gﬁ§d_vîsi⁄
-[] = "olsr.org -Öre-0.6.3-git_c15a68c-hash_a14c99a68f79d95c977e6757e404fb7d -";
+[] = "olsr.org -Öre-0.6.3-git_e000717-hash_815ee07772f8d8464c1bd96ae01da8aa -";
 
 3 c⁄° 
 	gbuûd_d©e
-[] = "2012-05-05 23:35:59";
+[] = "2012-05-07 18:45:50";
 
 4 c⁄° 
 	gbuûd_ho°

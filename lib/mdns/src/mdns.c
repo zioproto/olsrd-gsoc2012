@@ -112,10 +112,12 @@ PacketReceivedFromOLSR(unsigned char *encapsulationUdpData, int len)
       if ((encapsulationUdpData[0] & 0xf0) == 0x40) {
         dest.sll_protocol = htons(ETH_P_IP);
 	stripped_len = ntohs(ipHeader->ip_len);
+	memset(ipHeader->ip_ttl, 0x01, 1); //setting up TTL to 1 to avoid mdns packets flood 
 	}
       if ((encapsulationUdpData[0] & 0xf0) == 0x60) {
         dest.sll_protocol = htons(ETH_P_IPV6);
         stripped_len = 40 + ntohs(ip6Header->ip6_plen); //IPv6 Header size (40) + payload_len 
+        memset(ip6Header.ip6_un1->ip6_un1_hlim, 0x01, 1); //setting up Hop Limit to 1 to avoid mdns packets flood
         }
       // Sven-Ola: Don't know how to handle the "stripped_len is uninitialized" condition, maybe exit(1) is better...?
       if (0 == stripped_len) return;
@@ -135,10 +137,6 @@ PacketReceivedFromOLSR(unsigned char *encapsulationUdpData, int len)
        * in that case. */
       memset(dest.sll_addr, 0xFF, IFHWADDRLEN);
       
-      memset(encapsulationUdpData[7], 0x01, 1); /* Setting the encapsulated packet TTL to 1.
-						 * For ipv4 and ipv6 packet the TTL and Hop Limit is in the 8th octet,
-						 * so is not necessary create a condition to check packet type */
-
       nBytesWritten = sendto(walker->capturingSkfd, encapsulationUdpData, stripped_len, 0, (struct sockaddr *)&dest, sizeof(dest));
       if (nBytesWritten != stripped_len) {
         BmfPError("sendto() error forwarding unpacked encapsulated pkt on \"%s\"", walker->ifName);
@@ -391,10 +389,13 @@ BmfPacketCaptured(
   /* Check if the frame is captured on an OLSR-enabled interface */
   //isFromOlsrIntf = (intf->olsrIntf != NULL); TODO: put again this check
 
-  if(encapsulationUdpData[7] <= 0x01)  /* if the TTL or Hop Limit of the packet is 1 or less
-					* discard the packet to avoid mdns packet loop */
-	return;
+  if ((encapsulationUdpData[0] & 0xf0) == 0x60)		/* Discard mdns packet with hop limit
+ 	 if(ipHeader6.ip6_un1->ip6_un1_hlim <= 0x01)	 * 1 or less */
+		return;
 
+  if ((encapsulationUdpData[0] & 0xf0) == 0x40)		/* Discard mdns packet with TTL limit
+         if(ipHeader->ip_ttl <= 0x01)			 * 1 or less */
+                return;
 
   // send the packet to OLSR forward mechanism
   olsr_mdns_gen(encapsulationUdpData, nBytes);
