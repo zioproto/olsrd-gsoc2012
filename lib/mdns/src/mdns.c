@@ -72,8 +72,13 @@
 #include "NetworkInterfaces.h"  /* TBmfInterface, CreateBmfNetworkInterfaces(), CloseBmfNetworkInterfaces() */
 #include "Address.h"            /* IsMulticast() */
 #include "Packet.h"             /* ENCAP_HDR_LEN, BMF_ENCAP_TYPE, BMF_ENCAP_LEN etc. */
+#include "list_backport.h"
+
+#define OLSR_FOR_ALL_FILTEREDNODES_ENTRIES(n, iterator) list_for_each_element_safe(&ListOfFilteredHosts, n, list, iterator)
 
 int my_DNS_TTL=0;
+
+extern struct list_entity ListOfFilteredHosts;
 
 /* -------------------------------------------------------------------------
  * Function   : PacketReceivedFromOLSR
@@ -311,6 +316,16 @@ MainAddressOf(union olsr_ip_addr *ip)
 }                               /* MainAddressOf */
 
 
+static int
+isInFilteredList(union olsr_ip_addr *ip) {
+
+	//TODO: implement here check if IP is in filtered list
+
+return 1;
+
+}
+
+
 /* -------------------------------------------------------------------------
  * Function   : BmfPacketCaptured
  * Description: Handle a captured IP packet
@@ -332,6 +347,7 @@ BmfPacketCaptured(
                    unsigned char *encapsulationUdpData, int nBytes)
 {
   union olsr_ip_addr dst;              /* Destination IP address in captured packet */
+  union olsr_ip_addr src;              
   struct ip *ipHeader;                 /* The IP header inside the captured IP packet */
   struct ip6_hdr *ipHeader6;           /* The IP header inside the captured IP packet */
   struct udphdr *udpHeader;
@@ -342,6 +358,7 @@ BmfPacketCaptured(
     ipHeader = (struct ip *)ARM_NOWARN_ALIGN(encapsulationUdpData);
 
     dst.v4 = ipHeader->ip_dst;
+    src.v4 = ipHeader->ip_src;
 
     /* Only forward multicast packets. If configured, also forward local broadcast packets */
     if (IsMulticast(&dst)) {
@@ -359,11 +376,21 @@ BmfPacketCaptured(
     if (destPort != 5353) {
       return;
     }
+
+    if (isInFilteredList(&src)) {
+
+	return;
+    }
+
+
   }                             //END IPV4
 
   else if ((encapsulationUdpData[0] & 0xf0) == 0x60) {  //IPv6
 
     ipHeader6 = (struct ip6_hdr *)ARM_NOWARN_ALIGN(encapsulationUdpData);
+
+    //TODO: mettere dentro src.v6 l'indirizzo IPv6
+
     if (ipHeader6->ip6_dst.s6_addr[0] == 0xff)  //Multicast
     {
       //Continua
@@ -380,6 +407,11 @@ BmfPacketCaptured(
     if (destPort != 5353) {
       return;
     }
+    if (isInFilteredList(&src)) {
+    
+    return;
+    }
+
   }                             //END IPV6
   else
     return;                     //Is not IP packet
@@ -458,7 +490,8 @@ DoMDNS(int skfd, void *data __attribute__ ((unused)), unsigned int flags __attri
 int
 InitMDNS(struct interface *skipThisIntf)
 {
-
+   
+  listbackport_init_head(&ListOfFilteredHosts);
 
   //Tells OLSR to launch olsr_parser when the packets for this plugin arrive
   olsr_parser_add_function(&olsr_parser, PARSER_TYPE);
