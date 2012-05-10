@@ -117,7 +117,7 @@ PacketReceivedFromOLSR(unsigned char *encapsulationUdpData, int len)
       if ((encapsulationUdpData[0] & 0xf0) == 0x60) {
         dest.sll_protocol = htons(ETH_P_IPV6);
         stripped_len = 40 + ntohs(ip6Header->ip6_plen); //IPv6 Header size (40) + payload_len 
-        memset(ip6Header.ip6_un1->ip6_un1_hlim, 0x01, 1); //setting up Hop Limit to 1 to avoid mdns packets flood
+        memset(ip6Header->ip6_hops, 0x01, 1); //setting up Hop Limit to 1 to avoid mdns packets flood
         }
       // Sven-Ola: Don't know how to handle the "stripped_len is uninitialized" condition, maybe exit(1) is better...?
       if (0 == stripped_len) return;
@@ -390,7 +390,7 @@ BmfPacketCaptured(
   //isFromOlsrIntf = (intf->olsrIntf != NULL); TODO: put again this check
 
   if ((encapsulationUdpData[0] & 0xf0) == 0x60)		/* Discard mdns packet with hop limit
- 	 if(ipHeader6.ip6_un1->ip6_un1_hlim <= 0x01)	 * 1 or less */
+ 	 if(ipHeader6->ip6_hops <= 0x01)	 * 1 or less */
 		return;
 
   if ((encapsulationUdpData[0] & 0xf0) == 0x40)		/* Discard mdns packet with TTL limit
