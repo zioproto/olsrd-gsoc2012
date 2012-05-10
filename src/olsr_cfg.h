@@ -295,12 +295,12 @@ struct olsrd_config {
   bool has_ipv4_gateway, has_ipv6_gateway;
 
   int ioctl_s;                         /* Socket used for ioctl calls */
-#ifdef LINUX_NETLINK_ROUTING
+#ifdef linux
   int rtnl_s;                          /* Socket used for rtnetlink messages */
   int rt_monitor_socket;
 #endif
 
-#if defined __FreeBSD__ || defined __FreeBSD_kernel__ || defined __MacOSX__ || defined __NetBSD__ || defined __OpenBSD__
+#if defined __FreeBSD__ || defined __FreeBSD_kernel__ || defined __APPLE__ || defined __NetBSD__ || defined __OpenBSD__
   int rts;                             /* Socket used for route changes on BSDs */
 #endif
   float lq_nat_thresh;

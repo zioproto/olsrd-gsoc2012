@@ -2,6 +2,7 @@
 /*
  * The olsr.org Optimized Link-State Routing daemon(olsrd)
  * Copyright (c) 2004, Andreas Tonnesen(andreto@olsr.org)
+ *                     includes code by Bruno Randolf
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -39,31 +40,29 @@
  *
  */
 
-#ifndef _OLSR_KERNEL_RT
-#define _OLSR_KERNEL_RT
+/*
+ * Dynamic linked library for the olsr.org olsr daemon
+ */
 
-#include "defs.h"
-#include "routing_table.h"
+#ifndef _OLSRD_JSONINFO
+#define _OLSRD_JSONINFO
 
-int olsr_ioctl_add_route(const struct rt_entry *);
+#include "olsr_types.h"
+#include "olsrd_plugin.h"
+#include "plugin_util.h"
 
-int olsr_ioctl_add_route6(const struct rt_entry *);
+/* uncomment this to allow connections from 127.0.0.1 regardless of olsrd.conf (useful to allow externel ip/network + localhost) (ipv4 only)*/
+/* #define JSONINFO_ALLOW_LOCALHOST */
 
-int olsr_ioctl_del_route(const struct rt_entry *);
+extern union olsr_ip_addr jsoninfo_accept_ip;
+extern union olsr_ip_addr jsoninfo_listen_ip;
+extern int ipc_port;
+extern int nompr;
 
-int olsr_ioctl_del_route6(const struct rt_entry *);
-
-#ifdef linux
-int rtnetlink_register_socket(int);
-#endif
-
-void olsr_os_niit_4to6_route(const struct olsr_ip_prefix *dst_v4, bool set);
-void olsr_os_niit_6to4_route(const struct olsr_ip_prefix *dst_v6, bool set);
-void olsr_os_inetgw_tunnel_route(uint32_t if_idx, bool ipv4, bool set);
-
-int olsr_os_policy_rule(int family, int rttable, uint32_t priority, const char *if_name, bool set);
-int olsr_os_localhost_if(union olsr_ip_addr *ip, bool create);
-int olsr_os_ifip(int ifindex, union olsr_ip_addr *ip, bool create);
+int olsrd_plugin_interface_version(void);
+int olsrd_plugin_init(void);
+void olsr_plugin_exit(void);
+void olsrd_get_plugin_parameters(const struct olsrd_plugin_parameters **params, int *size);
 
 #endif
 
