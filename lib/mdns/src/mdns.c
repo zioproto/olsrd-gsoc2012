@@ -113,7 +113,6 @@ PacketReceivedFromOLSR(unsigned char *encapsulationUdpData, int len)
         dest.sll_protocol = htons(ETH_P_IP);
 	stripped_len = ntohs(ipHeader->ip_len);
 	ipHeader->ip_ttl = (u_int8_t) 1; //setting up TTL to 1 to avoid mdns packets flood 
-//	OLSR_DEBUG(LOG_PLUGINS, "MDNS PLUGIN got packet to OLSR message\n");
 	}
       if ((encapsulationUdpData[0] & 0xf0) == 0x60) {
         dest.sll_protocol = htons(ETH_P_IPV6);
@@ -362,6 +361,9 @@ BmfPacketCaptured(
     if (destPort != 5353) {
       return;
     }
+    if(((u_int8_t) ipHeader->ip_ttl) <= ((u_int8_t) 1))    // Discard mdns packet with TTL limit 1 or less
+      return;
+
   }                             //END IPV4
 
   else if ((encapsulationUdpData[0] & 0xf0) == 0x60) {  //IPv6
@@ -383,21 +385,15 @@ BmfPacketCaptured(
     if (destPort != 5353) {
       return;
     }
+    if(((uint8_t) ipHeader6->ip6_hops) <= ((uint8_t) 1))  // Discard mdns packet with hop limit 1 or less
+      return;
+
   }                             //END IPV6
   else
     return;                     //Is not IP packet
 
   /* Check if the frame is captured on an OLSR-enabled interface */
   //isFromOlsrIntf = (intf->olsrIntf != NULL); TODO: put again this check
-
-//  if ((encapsulationUdpData[0] & 0xf0) == 0x60)		/* Discard mdns packet with hop limit
-// 	 if(ipHeader6->ip6_hops <= (uint8_t) 0)	 	 * 1 or less */
-//	 OLSR_DEBUG(LOG_PLUGINS, "MDNS PLUGIN got packet from OLSR message\n");
-//		return;
-
-//  if ((encapsulationUdpData[0] & 0xf0) == 0x40)		/* Discard mdns packet with TTL limit
-//         if(ipHeader->ip_ttl <= (u_int8_t) 0		 * 1 or less */
-//                return;
 
   // send the packet to OLSR forward mechanism
   olsr_mdns_gen(encapsulationUdpData, nBytes);
