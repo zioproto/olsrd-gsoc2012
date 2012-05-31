@@ -164,7 +164,7 @@ CreateCaptureSocket(const char *ifName)
     return -1;
   }
   //AddDescriptorToInputSet(skfd);
-  add_olsr_socket(skfd, &DoMDNS,NULL, NULL, SP_PR_READ);
+  add_olsr_socket(skfd, &DoMDNS,ifName, NULL, SP_PR_READ);
 
   return skfd;
 }                               /* CreateCaptureSocket */

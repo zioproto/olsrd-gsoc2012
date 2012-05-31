@@ -71,7 +71,7 @@ struct interface;
 //extern int FanOutLimit;
 //extern int BroadcastRetransmitCount;
 
-void DoMDNS(int sd, void *x, unsigned int y);
+void DoMDNS(int sd, const char *ifName, unsigned int y);
 void BmfPError(const char *format, ...) __attribute__ ((format(printf, 1, 2)));
 union olsr_ip_addr *MainAddressOf(union olsr_ip_addr *ip);
 //int InterfaceChange(struct interface* interf, int action);

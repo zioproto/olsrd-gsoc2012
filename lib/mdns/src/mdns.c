@@ -342,19 +342,6 @@ BmfPacketCaptured(
   if ((encapsulationUdpData[0] & 0xf0) == 0x40) {       //IPV4
 
     ipHeader = (struct ip *)ARM_NOWARN_ALIGN(encapsulationUdpData);
-    struct link_entry *my_link = NULL;
-    
-   /* 	First of all check if I should capture packets or there is another router
-	in the LAN doing this Rule: only router with the lowest IP address of the LAN
-	should capture the packets. If I find a neighbor with a IP address lower than
-	mine then abort here 
-   */ 
-    OLSR_FOR_ALL_LINK_ENTRIES(my_link) {
-    
-   	if (my_link->neighbor_iface_addr.v4.s_addr <  my_link->local_iface_addr.v4.s_addr) return;
-
-   } OLSR_FOR_ALL_LINK_ENTRIES_END(my_link);
-
 
     dst.v4 = ipHeader->ip_dst;
 
@@ -422,7 +409,7 @@ BmfPacketCaptured(
  * Data Used  :
  * ------------------------------------------------------------------------- */
 void
-DoMDNS(int skfd, void *data __attribute__ ((unused)), unsigned int flags __attribute__ ((unused)))
+DoMDNS(int skfd, const char *ifName, unsigned int flags __attribute__ ((unused)))
 {
   unsigned char rxBuffer[BMF_BUFFER_SIZE];
   if (skfd >= 0) {
@@ -430,6 +417,22 @@ DoMDNS(int skfd, void *data __attribute__ ((unused)), unsigned int flags __attri
     socklen_t addrLen = sizeof(pktAddr);
     int nBytes;
     unsigned char *ipPacket;
+
+    struct link_entry *my_link = NULL;
+    
+   /* 	First of all check if I should capture packets or there is another router
+	in the LAN doing this Rule: only router with the lowest IP address of the LAN
+	should capture the packets. If I find a neighbor with a IP address lower than
+	mine then abort here 
+   */ 
+    OLSR_FOR_ALL_LINK_ENTRIES(my_link) {
+    	if ( strcmp (my_link->if_name,ifName) == 0) {
+   		if (my_link->neighbor_iface_addr.v4.s_addr <  my_link->local_iface_addr.v4.s_addr) 
+			return;
+        }
+   } OLSR_FOR_ALL_LINK_ENTRIES_END(my_link);
+
+
 
     /* Receive the captured Ethernet frame, leaving space for the BMF
      * encapsulation header */
