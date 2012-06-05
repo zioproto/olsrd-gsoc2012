@@ -76,7 +76,7 @@
 
 #define OLSR_FOR_ALL_FILTEREDNODES_ENTRIES(n, iterator) list_for_each_element_safe(&ListOfFilteredHosts, n, list, iterator)
 
-extern struct list_entity ListOfFilteredHosts;
+struct list_entity ListOfFilteredHosts;
 
 /* -------------------------------------------------------------------------
  * Function   : PacketReceivedFromOLSR
