@@ -68,6 +68,10 @@ struct TBmfInterface {
    * Used only when PlParam "BmfMechanism" is set to "UnicastPromiscuous". */
   int listeningSkfd;
 
+  /* File descriptor of UDP packet socket, used for listening router election hello
+   * packets */
+  int electionSkfd;
+
   unsigned char macAddr[IFHWADDRLEN];
 
   char ifName[IFNAMSIZ];

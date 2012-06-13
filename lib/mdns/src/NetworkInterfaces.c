@@ -171,6 +171,88 @@ CreateCaptureSocket(const char *ifName)
   return skfd;
 }                               /* CreateCaptureSocket */
 
+
+/* -------------------------------------------------------------------------
+ * Function   : CreateRouterElectionSocket
+ * Description: Create socket for capturing router election hello packets
+ * Input      : ifname - network interface (e.g. "eth0")
+ * Output     : none
+ * Return     : the socket descriptor ( >= 0), or -1 if an error occurred
+ * Data Used  : none
+ * Notes      : The socket is a cooked IP packet socket, bound to the specified
+ *              network interface
+ * ------------------------------------------------------------------------- */
+static int
+CreateRouterElectionSocket(const char *ifName)
+{
+  int ifIndex = if_nametoindex(ifName);
+  struct ifreq req;
+  struct sockaddr_in bindTo;
+  struct sockaddr_in6 bindTo6;
+  struct ip_mreq  mreq;
+  struct in_addr ipv4_addr;
+  int skfd = 0;
+  int on;
+
+  /* Open IP packet socket */
+  if (olsr_cnf->ip_version == AF_INET) {
+    skfd = socket(AF_INET, SOCK_DGRAM, 0);		//open ipv4 socket
+    strncpy(req.ifr_name, ifName, strlen(ifName));	//"retrieve interface
+    req.ifr_addr.sa_family = AF_INET;			//address by interface
+    ioctl(skfd, SIOCGIFADDR, &req);			//name"
+  } else {
+    skfd = socket(AF_INET6, SOCK_DGRAM, 0);
+    strncpy(req.ifr_name, ifName, strlen(ifName));
+    req.ifr_addr.sa_family = AF_INET6;
+    ioctl(skfd, SIOCGIFADDR, &req);
+  }
+  if (skfd < 0) {
+    BmfPError("socket(AF_INET_INET6_ERROR) error");
+    return -1;
+  }
+
+  /* Bind the socket to the specified interface */
+  if(setsockopt(skfd, SOL_SOCKET, SO_BINDTODEVICE, &ifName, strlen(ifName)) < 0){
+    BmfPError("BINDTODEVICE error");
+    close(skfd);
+    return -1;
+  }
+
+  if (olsr_cnf->ip_version == AF_INET) {
+    memset(&bindTo, 0, sizeof(bindTo));
+    ipv4_addr = ((struct sockaddr_in *)&req.ifr_addr)->sin_addr;	 		//interface address
+    bindTo.sin_addr.s_addr = ipv4_addr.s_addr;						//bind socket to interface address
+    setsockopt(skfd, IPPROTO_IP, IP_MULTICAST_IF, &ipv4_addr, sizeof(ipv4_addr));	//set up socket for multicast mode
+    mreq.imr_interface = ipv4_addr;							//"assign multicast group
+    mreq.imr_multiaddr.s_addr = inet_addr("224.0.0.2");					//224.0.0.2 to
+    setsockopt(skfd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq));		//socket"
+    bindTo.sin_family = AF_INET;							//bind socket to ipv4 mode
+    bindTo.sin_port = htons(5354);							//bind socket to 5354 port
+    if (bind(skfd, (struct sockaddr *)&bindTo, sizeof(bindTo)) < 0) {
+     BmfPError("bind() error");
+     close(skfd);
+     return -1;
+    }
+  } else {
+    memset(&bindTo6, 0, sizeof(bindTo6));
+    on = 1;
+    setsockopt(skfd, IPPROTO_IPV6, IPV6_V6ONLY, &on, sizeof(on)); 
+    memcpy(&bindTo6.sin6_addr, &((struct sockaddr_in6 *)&req.ifr_addr)->sin6_addr, sizeof(struct in6_addr));
+    bindTo6.sin6_family = AF_INET6;
+    bindTo6.sin6_port = htons(5354);
+    if (bind(skfd, (struct sockaddr *)&bindTo6, sizeof(bindTo6)) < 0) {
+     BmfPError("bind() error");
+     close(skfd);
+     return -1;
+    }
+  }
+  
+  //AddDescriptorToInputSet(skfd);
+//  add_olsr_socket(skfd, &DoElection,NULL, NULL, SP_PR_READ);
+
+  return skfd;
+}                               /* CreateRouterElectionSocket */
+
 /* -------------------------------------------------------------------------
  * Function   : CreateInterface
  * Description: Create a new TBmfInterface object and adds it to the global
@@ -191,6 +273,7 @@ CreateInterface(const char *ifName, struct interface *olsrIntf)
   int capturingSkfd = -1;
   int encapsulatingSkfd = -1;
   int listeningSkfd = -1;
+  int electionSkfd = -1;
   int ioctlSkfd;
   struct ifreq ifr;
   int nOpened = 0;
@@ -208,8 +291,13 @@ CreateInterface(const char *ifName, struct interface *olsrIntf)
    * non-OLSR interfaces, and on OLSR-interfaces if configured. */
   if ((olsrIntf == NULL)) {
     capturingSkfd = CreateCaptureSocket(ifName);
-    if (capturingSkfd < 0) {
+    electionSkfd = CreateRouterElectionSocket(ifName);
+    if (capturingSkfd < 0 || electionSkfd < 0) {
       close(encapsulatingSkfd);
+      if (capturingSkfd > 0)
+      	close(capturingSkfd);
+      if (electionSkfd > 0)
+      	close(electionSkfd);
       free(newIf);
       return 0;
     }
@@ -229,6 +317,7 @@ CreateInterface(const char *ifName, struct interface *olsrIntf)
     BmfPError("ioctl(SIOCGIFHWADDR) error for interface \"%s\"", ifName);
     close(capturingSkfd);
     close(encapsulatingSkfd);
+    close(electionSkfd);
     free(newIf);
     return 0;
   }
@@ -237,6 +326,7 @@ CreateInterface(const char *ifName, struct interface *olsrIntf)
   newIf->capturingSkfd = capturingSkfd;
   newIf->encapsulatingSkfd = encapsulatingSkfd;
   newIf->listeningSkfd = listeningSkfd;
+  newIf->electionSkfd = electionSkfd;
   memcpy(newIf->macAddr, ifr.ifr_hwaddr.sa_data, IFHWADDRLEN);
   memcpy(newIf->ifName, ifName, IFNAMSIZ);
   newIf->olsrIntf = olsrIntf;
@@ -471,6 +561,10 @@ CloseBmfNetworkInterfaces(void)
     }
     if (bmfIf->encapsulatingSkfd >= 0) {
       close(bmfIf->encapsulatingSkfd);
+      nClosed++;
+    }
+    if (bmfIf->electionSkfd >= 0) {
+      close(bmfIf->electionSkfd);
       nClosed++;
     }
     //OLSR_PRINTF(
