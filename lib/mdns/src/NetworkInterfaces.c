@@ -185,73 +185,243 @@ CreateCaptureSocket(const char *ifName)
 static int
 CreateRouterElectionSocket(const char *ifName)
 {
-  int ifIndex = if_nametoindex(ifName);
-  struct ifreq req;
-  struct sockaddr_in bindTo;
-  struct sockaddr_in6 bindTo6;
-  struct ip_mreq  mreq;
-  struct in_addr ipv4_addr;
-  int skfd = 0;
-  int on;
+  	int ipFamilySetting;
+	int ipProtoSetting;
+	int ipMcLoopSetting;
+	int ipAddMembershipSetting;
+	short int ipPort = htons(5354);
+	struct in_addr ipv4_addr;
+	struct ifreq req;
+	int ifIndex = if_nametoindex(ifName);
 
-  /* Open IP packet socket */
-  if (olsr_cnf->ip_version == AF_INET) {
-    skfd = socket(AF_INET, SOCK_DGRAM, 0);		//open ipv4 socket
-    strncpy(req.ifr_name, ifName, strlen(ifName));	//"retrieve interface
-    req.ifr_addr.sa_family = AF_INET;			//address by interface
-    ioctl(skfd, SIOCGIFADDR, &req);			//name"
-  } else {
-    skfd = socket(AF_INET6, SOCK_DGRAM, 0);
-    strncpy(req.ifr_name, ifName, strlen(ifName));
-    req.ifr_addr.sa_family = AF_INET6;
-    ioctl(skfd, SIOCGIFADDR, &req);
-  }
-  if (skfd < 0) {
-    BmfPError("socket(AF_INET_INET6_ERROR) error");
-    return -1;
-  }
+	void * addr;
+	size_t addrSize;
+	union olsr_sockaddr address;
 
-  /* Bind the socket to the specified interface */
-  if(setsockopt(skfd, SOL_SOCKET, SO_BINDTODEVICE, &ifName, strlen(ifName)) < 0){
-    BmfPError("BINDTODEVICE error");
-    close(skfd);
-    return -1;
-  }
+	int rxSocket = -1;
 
-  if (olsr_cnf->ip_version == AF_INET) {
-    memset(&bindTo, 0, sizeof(bindTo));
-    ipv4_addr = ((struct sockaddr_in *)&req.ifr_addr)->sin_addr;	 		//interface address
-    bindTo.sin_addr.s_addr = ipv4_addr.s_addr;						//bind socket to interface address
-    setsockopt(skfd, IPPROTO_IP, IP_MULTICAST_IF, &ipv4_addr, sizeof(ipv4_addr));	//set up socket for multicast mode
-    mreq.imr_interface = ipv4_addr;							//"assign multicast group
-    mreq.imr_multiaddr.s_addr = inet_addr("224.0.0.2");					//224.0.0.2 to
-    setsockopt(skfd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq));		//socket"
-    bindTo.sin_family = AF_INET;							//bind socket to ipv4 mode
-    bindTo.sin_port = htons(5354);							//bind socket to 5354 port
-    if (bind(skfd, (struct sockaddr *)&bindTo, sizeof(bindTo)) < 0) {
-     BmfPError("bind() error");
-     close(skfd);
-     return -1;
-    }
-  } else {
-    memset(&bindTo6, 0, sizeof(bindTo6));
-    on = 1;
-    setsockopt(skfd, IPPROTO_IPV6, IPV6_V6ONLY, &on, sizeof(on)); 
-    memcpy(&bindTo6.sin6_addr, &((struct sockaddr_in6 *)&req.ifr_addr)->sin6_addr, sizeof(struct in6_addr));
-    bindTo6.sin6_family = AF_INET6;
-    bindTo6.sin6_port = htons(5354);
-    if (bind(skfd, (struct sockaddr *)&bindTo6, sizeof(bindTo6)) < 0) {
-     BmfPError("bind() error");
-     close(skfd);
-     return -1;
-    }
-  }
-  
-  //AddDescriptorToInputSet(skfd);
-//  add_olsr_socket(skfd, &DoElection,NULL, NULL, SP_PR_READ);
+	int socketReuseFlagValue = 1;
+	int mcLoopValue = 1;
 
-  return skfd;
+
+	memset(&address, 0, sizeof(address));
+	if (olsr_cnf->ip_version == AF_INET) {
+		ipFamilySetting = AF_INET;
+		ipProtoSetting = IPPROTO_IP;
+		ipMcLoopSetting = IP_MULTICAST_LOOP;
+		ipAddMembershipSetting = IP_ADD_MEMBERSHIP;
+
+		address.in4.sin_family = ipFamilySetting;
+		address.in4.sin_addr.s_addr = INADDR_ANY;
+		address.in4.sin_port = ipPort;
+		addr = &address.in4;
+		addrSize = sizeof(struct sockaddr_in);
+	} else {
+		ipFamilySetting = AF_INET6;
+		ipProtoSetting = IPPROTO_IPV6;
+		ipMcLoopSetting = IPV6_MULTICAST_LOOP;
+		ipAddMembershipSetting = IPV6_ADD_MEMBERSHIP;
+
+		address.in6.sin6_family = ipFamilySetting;
+		address.in6.sin6_addr = in6addr_any;
+		address.in6.sin6_port = ipPort;
+		addr = &address.in6;
+		addrSize = sizeof(struct sockaddr_in6);
+	}
+
+	/* Create a datagram socket on which to receive. */
+	errno = 0;
+	rxSocket = socket(ipFamilySetting, SOCK_DGRAM, 0);
+	if (rxSocket < 0) {
+		BmfPError("Could not create a receive socket for interface %s",
+				ifName);
+		goto bail;
+	}
+
+	/* Enable SO_REUSEADDR to allow multiple applications to receive the same
+	 * multicast messages */
+	errno = 0;
+	if (setsockopt(rxSocket, SOL_SOCKET, SO_REUSEADDR, &socketReuseFlagValue,
+			sizeof(socketReuseFlagValue)) < 0) {
+		BmfPError("Could not set the reuse flag on the receive socket for"
+			" interface %s", ifName);
+		goto bail;
+	}
+
+	/* Bind to the proper port number with the IP address INADDR_ANY
+	 * (INADDR_ANY is really required here, do not change it) */
+	errno = 0;
+	if (bind(rxSocket, addr, addrSize) < 0) {
+		BmfPError("Could not bind the receive socket for interface"
+			" %s to port %u", ifName, ntohs(ipPort));
+		goto bail;
+	}
+
+	/* Enable multicast local loopback */
+	errno = 0;
+	if (setsockopt(rxSocket, ipProtoSetting, ipMcLoopSetting, &mcLoopValue,
+			sizeof(mcLoopValue)) < 0) {
+		BmfPError("Could not %s multicast loopback on the"
+			" receive socket for interface %s", mcLoopValue ? "enable"
+				: "disable", ifName);
+		goto bail;
+	}
+
+	/* Join the multicast group on the local interface. Note that this
+	 * ADD_MEMBERSHIP option must be called for each local interface over
+	 * which the multicast datagrams are to be received. */
+	if (ipFamilySetting == AF_INET) {
+		struct ip_mreq mc_settings;
+		(void) memset(&mc_settings, 0, sizeof(mc_settings));
+		inet_pton(AF_INET, "224.0.0.2", &mc_settings.imr_multiaddr.s_addr);
+		(void) memset(&req, 0, sizeof(struct ifreq));
+		strncpy(req.ifr_name, ifName, IFNAMSIZ - 1);
+		req.ifr_name[IFNAMSIZ -1] = '\0';	/* Ensure null termination */
+		if(ioctl(rxSocket, SIOCGIFADDR, &req)){
+			BmfPError("Could not get ipv4 address of %s interface", ifName);
+			goto bail;
+		}
+		ipv4_addr = ((struct sockaddr_in *)&req.ifr_addr)->sin_addr;
+		mc_settings.imr_interface = ipv4_addr;
+		errno = 0;
+		if (setsockopt(rxSocket, ipProtoSetting, ipAddMembershipSetting,
+				&mc_settings, sizeof(mc_settings)) < 0) {
+			BmfPError("Could not subscribe interface %s to the configured"
+				" multicast group", ifName);
+			goto bail;
+		}
+	} else {
+		struct ipv6_mreq mc6_settings;
+		(void) memset(&mc6_settings, 0, sizeof(mc6_settings));
+		inet_pton(AF_INET6, "ff02::2", &mc6_settings.ipv6mr_multiaddr.s6_addr);
+		mc6_settings.ipv6mr_interface = ifIndex;
+		errno = 0;
+		if (setsockopt(rxSocket, ipProtoSetting, ipAddMembershipSetting,
+				&mc6_settings, sizeof(mc6_settings)) < 0) {
+			BmfPError("Could not subscribe interface %s to the configured"
+				" multicast group", ifName);
+			goto bail;
+		}
+	}
+
+	add_olsr_socket(rxSocket, DoElection, NULL, NULL,
+			SP_PR_READ);
+
+	return rxSocket;
+
+	bail: if (rxSocket >= 0) {
+		close(rxSocket);
+	}
+	return -1;
 }                               /* CreateRouterElectionSocket */
+
+static int CreateHelloSocket(const char *ifName) {
+	int ipFamilySetting;
+	int ipProtoSetting;
+	int ipMcLoopSetting;
+	int ipMcIfSetting;
+	int ipTtlSetting;
+	short int ipPort = htons(5354);
+	struct in_addr ipv4_addr;
+	struct ifreq req;
+	int ifIndex = if_nametoindex(ifName);
+
+	void * addr;
+	size_t addrSize;
+	union olsr_sockaddr address;
+
+	int txSocket = -1;
+
+	int mcLoopValue = 0;
+	int txTtl = 1;
+
+	memset(&address, 0, sizeof(address));
+	if (olsr_cnf->ip_version == AF_INET) {
+		ipFamilySetting = AF_INET;
+		ipProtoSetting = IPPROTO_IP;
+		ipMcLoopSetting = IP_MULTICAST_LOOP;
+		ipMcIfSetting = IP_MULTICAST_IF;
+		ipTtlSetting = IP_MULTICAST_TTL;
+		ifIndex = if_nametoindex(ifName);
+	} else {
+		ipFamilySetting = AF_INET6;
+		ipProtoSetting = IPPROTO_IPV6;
+		ipMcLoopSetting = IPV6_MULTICAST_LOOP;
+		ipMcIfSetting = IPV6_MULTICAST_IF;
+		ipTtlSetting = IPV6_MULTICAST_HOPS;
+		ifIndex = if_nametoindex(ifName);
+
+		addr = &ifIndex;
+		addrSize = sizeof(ifIndex);
+	}
+
+	/*  Create a datagram socket on which to transmit */
+	errno = 0;
+	txSocket = socket(ipFamilySetting, SOCK_DGRAM, 0);
+	if (txSocket < 0) {
+		BmfPError("Could not create a transmit socket for interface %s",
+				ifName);
+		goto bail;
+	}
+
+	if (olsr_cnf->ip_version == AF_INET) {
+		(void) memset(&req, 0, sizeof(struct ifreq));
+		strncpy(req.ifr_name, ifName, IFNAMSIZ - 1);
+		req.ifr_name[IFNAMSIZ -1] = '\0';	/* Ensure null termination */
+		if(ioctl(txSocket, SIOCGIFADDR, &req)){
+			BmfPError("Could not get ipv4 address of %s interface", ifName);
+			goto bail;
+		}
+		ipv4_addr = ((struct sockaddr_in *)&req.ifr_addr)->sin_addr;
+		address.in4.sin_addr = ipv4_addr;
+		address.in4.sin_family = ipFamilySetting;
+		address.in4.sin_port = ipPort;
+		addr = &address.in4;
+		addrSize = sizeof(struct sockaddr_in);
+	}
+
+	/* Bind the socket to the desired interface */
+	errno = 0;
+	if (setsockopt(txSocket, ipProtoSetting, ipMcIfSetting, addr, addrSize) < 0) {
+		BmfPError("Could not set the multicast interface on the"
+			" transmit socket to interface %s", ifName);
+		goto bail;
+	}
+
+	/* Disable multicast local loopback */
+	errno = 0;
+	if (setsockopt(txSocket, ipProtoSetting, ipMcLoopSetting, &mcLoopValue,
+			sizeof(mcLoopValue)) < 0) {
+		BmfPError("Could not %s multicast loopback on the"
+			" transmit socket for interface %s", mcLoopValue ? "enable"
+				: "disable", ifName);
+		goto bail;
+	}
+
+	/* Set the TTL on the socket */
+	errno = 0;
+	if (setsockopt(txSocket, ipProtoSetting, ipTtlSetting, &txTtl,
+			sizeof(txTtl)) < 0) {
+		BmfPError("Could not set TTL on the transmit socket"
+			" for interface %s", ifName);
+		goto bail;
+	}
+
+	/* Set the no delay option on the socket */
+	errno = 0;
+	if (fcntl(txSocket, F_SETFL, O_NDELAY) < 0) {
+		BmfPError("Could not set the no delay option on the"
+			" transmit socket for interface %s", ifName);
+		goto bail;
+	}
+
+	return txSocket;
+
+	bail: if (txSocket >= 0) {
+		close(txSocket);
+	}
+	return -1;
+}
 
 /* -------------------------------------------------------------------------
  * Function   : CreateInterface
@@ -274,6 +444,7 @@ CreateInterface(const char *ifName, struct interface *olsrIntf)
   int encapsulatingSkfd = -1;
   int listeningSkfd = -1;
   int electionSkfd = -1;
+  int helloSkfd = -1;
   int ioctlSkfd;
   struct ifreq ifr;
   int nOpened = 0;
@@ -292,12 +463,12 @@ CreateInterface(const char *ifName, struct interface *olsrIntf)
   if ((olsrIntf == NULL)) {
     capturingSkfd = CreateCaptureSocket(ifName);
     electionSkfd = CreateRouterElectionSocket(ifName);
-    if (capturingSkfd < 0 || electionSkfd < 0) {
+    helloSkfd = CreateHelloSocket(ifName);
+    if (capturingSkfd < 0 || electionSkfd < 0 || helloSkfd < 0) {
       close(encapsulatingSkfd);
-      if (capturingSkfd > 0)
-      	close(capturingSkfd);
-      if (electionSkfd > 0)
-      	close(electionSkfd);
+      close(capturingSkfd);
+      close(electionSkfd);
+      close(helloSkfd);
       free(newIf);
       return 0;
     }
@@ -318,6 +489,7 @@ CreateInterface(const char *ifName, struct interface *olsrIntf)
     close(capturingSkfd);
     close(encapsulatingSkfd);
     close(electionSkfd);
+    close(helloSkfd);
     free(newIf);
     return 0;
   }
@@ -327,6 +499,7 @@ CreateInterface(const char *ifName, struct interface *olsrIntf)
   newIf->encapsulatingSkfd = encapsulatingSkfd;
   newIf->listeningSkfd = listeningSkfd;
   newIf->electionSkfd = electionSkfd;
+  newIf->helloSkfd = helloSkfd;
   memcpy(newIf->macAddr, ifr.ifr_hwaddr.sa_data, IFHWADDRLEN);
   memcpy(newIf->ifName, ifName, IFNAMSIZ);
   newIf->olsrIntf = olsrIntf;

@@ -72,6 +72,10 @@ struct TBmfInterface {
    * packets */
   int electionSkfd;
 
+  /* File descriptor of UDP packet socket, used for sending router election hello
+   * packets */
+  int helloSkfd;
+
   unsigned char macAddr[IFHWADDRLEN];
 
   char ifName[IFNAMSIZ];
