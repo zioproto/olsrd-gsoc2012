@@ -55,6 +55,7 @@
 
 /* Size of buffer in which packets are received */
 #define BMF_BUFFER_SIZE 2048
+#define HELLO_BUFFER_SIZE 2048
 
 struct TBmfInterface {
   /* File descriptor of raw packet socket, used for capturing multicast packets */

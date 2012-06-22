@@ -73,6 +73,7 @@
 #include "Address.h"            /* IsMulticast() */
 #include "Packet.h"             /* ENCAP_HDR_LEN, BMF_ENCAP_TYPE, BMF_ENCAP_LEN etc. */
 #include "list_backport.h"
+#include "RouterElection.h"
 
 #define OLSR_FOR_ALL_FILTEREDNODES_ENTRIES(n, iterator) list_for_each_element_safe(&ListOfFilteredHosts, n, list, iterator)
 
@@ -521,4 +522,55 @@ void
 CloseMDNS(void)
 {
   CloseBmfNetworkInterfaces();
+}
+
+void DoElection(int skfd, void *data __attribute__ ((unused)), unsigned int flags __attribute__ ((unused)))
+{
+  static const char * rxBufferPrefix = "$REP";
+  static const size_t rxBufferPrefixLength = 3;
+  unsigned char rxBuffer[HELLO_BUFFER_SIZE];
+  ssize_t rxCount;
+  union olsr_sockaddr sender;
+  socklen_t senderSize = sizeof(sender);
+  struct RtElHelloPkt *rcvPkt;
+  struct RouterListEntry listEntry;
+  struct RouterListEntry6 listEntry6;
+
+  if (skfd >= 0) {
+    memset(&sender, 0, senderSize);
+    rxCount = recvfrom(skfd, &rxBuffer[0], (sizeof(rxBuffer) - 1), 0,
+		(struct sockaddr *)&sender, &senderSize);
+    if(rxCount < 0){
+      BmfPError("Receive error in %s, ignoring message.", __func__);
+      return;
+    }
+
+  /* make sure the string is null terminated */
+  rxBuffer[rxCount] = '\0';
+
+  /* do not process when this message doesn't start with $REP */
+  if ((rxCount < rxBufferPrefixLength) || (strncmp((char *) rxBuffer,
+		  rxBufferPrefix, rxBufferPrefixLength) != 0))
+    return;
+
+  if (rxCount < sizeof(struct RtElHelloPkt))
+    return;					// too small to be a hello pkt
+  else
+    rcvPkt = (struct RtElHelloPkt *)ARM_NOWARN_ALIGN(rxBuffer);
+
+  if (rcvPkt->ipFamily == AF_INET){
+    if(ParseElectionPacket(rcvPkt, &listEntry)){
+    }
+    else
+     return;					//packet not valid
+  }
+  else{
+    if(ParseElectionPacket6(rcvPkt, &listEntry6)){
+    }
+    else
+      return;					//packet not valid
+  }
+  
+  }
+ return;
 }
