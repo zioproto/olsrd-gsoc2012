@@ -5,7 +5,7 @@ struct RtElHelloPkt{
   int ipFamily;
   char router_id[40];
   char network_id[40];
-};
+} __attribute__ ((packed));
 
 struct RouterListEntry{
   struct in_addr router_id;
