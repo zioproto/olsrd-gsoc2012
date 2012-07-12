@@ -548,7 +548,7 @@ void DoElection(int skfd, void *data __attribute__ ((unused)), unsigned int flag
   struct RouterListEntry *listEntry;
   struct RouterListEntry6 *listEntry6;
 
-  OLSR_PRINTF(0,"Packet Received \n");
+  OLSR_PRINTF(1,"Packet Received \n");
 
   if (skfd >= 0) {
     memset(&sender, 0, senderSize);
@@ -575,7 +575,7 @@ void DoElection(int skfd, void *data __attribute__ ((unused)), unsigned int flag
   if (rcvPkt->ipFamily == AF_INET){
     listEntry = (struct RouterListEntry *)malloc(sizeof(struct RouterListEntry));
     if(ParseElectionPacket(rcvPkt, listEntry)){
-      OLSR_PRINTF(0,"processing ipv4 packet \n");
+      OLSR_PRINTF(1,"processing ipv4 packet \n");
       (void) UpdateRouterList(listEntry);
     }
     else{
@@ -586,6 +586,7 @@ void DoElection(int skfd, void *data __attribute__ ((unused)), unsigned int flag
   else{
     listEntry6 = (struct RouterListEntry6 *)malloc(sizeof(struct RouterListEntry6));
     if(ParseElectionPacket6(rcvPkt, listEntry6)){
+      OLSR_PRINTF(1,"processing ipv6 packet");
       (void) UpdateRouterList6(listEntry6);
     }
     else{

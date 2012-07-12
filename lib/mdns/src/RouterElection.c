@@ -124,7 +124,7 @@ void helloTimer (void *foo __attribute__ ((unused))){
     else{
       memset((char *) &dest6, 0, sizeof(dest6));
       dest6.sin6_family = AF_INET6;
-      (void) inet_pton(AF_INET6, "ff01::fb", &dest6.sin6_addr);
+      (void) inet_pton(AF_INET6, "ff02::2", &dest6.sin6_addr);
       dest6.sin6_port = htons(5354);
 
       OLSR_PRINTF(1,"hello running \n");
