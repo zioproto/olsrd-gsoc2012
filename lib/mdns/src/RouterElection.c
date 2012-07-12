@@ -34,8 +34,10 @@
 #include "RouterElection.h"
 #include "mdns.h"
 
-ISMASTER = 1;
+int ISMASTER = 1;
 struct RtElHelloPkt *hello;
+short NETWORK_ID;
+union olsr_ip_addr *ROUTER_ID;
 
 //List for routers
 struct list_entity *ListOfRouter;
@@ -128,7 +130,7 @@ void helloTimer (void *foo __attribute__ ((unused))){
 
       OLSR_PRINTF(0,"hello running \n");
 
-      OLSR_PRINTF(0,"%i \n", sendto(walker->helloSkfd, (const char * ) hello, 
+      OLSR_PRINTF(0,"%zd \n", sendto(walker->helloSkfd, (const char * ) hello, 
 			sizeof(struct RtElHelloPkt), 0, (struct sockaddr *)&dest, sizeof(dest)));
     }
     else{
@@ -188,7 +190,6 @@ void electTimer (void *foo __attribute__ ((unused))){
 void initTimer (void *foo __attribute__ ((unused))){
   ListOfRouter = (struct list_entity *) malloc(sizeof(struct list_entity));
   listbackport_init_head(ListOfRouter);
-  char hd[] = "$REP";
 
   NETWORK_ID = ((uint8_t) 1);             //Default Network id
 
@@ -197,7 +198,7 @@ void initTimer (void *foo __attribute__ ((unused))){
   memcpy(&ROUTER_ID, &olsr_cnf->main_addr, sizeof(union olsr_ip_addr));
   hello = (struct RtElHelloPkt *) malloc(sizeof(struct RtElHelloPkt));
   OLSR_PRINTF(0,"initialization running step 1\n");
-  strcpy(hello->head, hd);
+  strcpy(hello->head, "$REP");
   hello->ipFamily = AF_INET;
   hello->network_id = htons(NETWORK_ID);
   memcpy(&hello->router_id, &ROUTER_ID, sizeof(union olsr_ip_addr));
@@ -214,7 +215,7 @@ set_Network_ID(const char *Network_ID, void *data __attribute__ ((unused)), set_
 } /* Set Network ID */
 
 
-int InitRouterList(){
+int InitRouterList(void *foo __attribute__ ((unused))){
 
   struct olsr_cookie_info *RouterElectionTimerCookie = NULL;
   struct olsr_cookie_info *HelloTimerCookie = NULL;
