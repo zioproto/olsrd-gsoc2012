@@ -545,8 +545,8 @@ void DoElection(int skfd, void *data __attribute__ ((unused)), unsigned int flag
   union olsr_sockaddr sender;
   socklen_t senderSize = sizeof(sender);
   struct RtElHelloPkt *rcvPkt;
-  struct RouterListEntry listEntry;
-  struct RouterListEntry6 listEntry6;
+  struct RouterListEntry *listEntry;
+  struct RouterListEntry6 *listEntry6;
 
   OLSR_PRINTF(0,"Packet Received \n");
 
@@ -573,19 +573,25 @@ void DoElection(int skfd, void *data __attribute__ ((unused)), unsigned int flag
     rcvPkt = (struct RtElHelloPkt *)ARM_NOWARN_ALIGN(rxBuffer);
 
   if (rcvPkt->ipFamily == AF_INET){
-    if(ParseElectionPacket(rcvPkt, &listEntry)){
-    OLSR_PRINTF(0,"processing ipv4 packet \n");
-    (void) UpdateRouterList(&listEntry);
+    listEntry = (struct RouterListEntry *)malloc(sizeof(struct RouterListEntry));
+    if(ParseElectionPacket(rcvPkt, listEntry)){
+      OLSR_PRINTF(0,"processing ipv4 packet \n");
+      (void) UpdateRouterList(listEntry);
     }
-    else
-     return;					//packet not valid
+    else{
+      free(listEntry);
+      return;					//packet not valid
+    }
   }
   else{
-    if(ParseElectionPacket6(rcvPkt, &listEntry6)){
-    (void) UpdateRouterList6(&listEntry6);
+    listEntry6 = (struct RouterListEntry6 *)malloc(sizeof(struct RouterListEntry6));
+    if(ParseElectionPacket6(rcvPkt, listEntry6)){
+      (void) UpdateRouterList6(listEntry6);
     }
-    else
+    else{
+      free(listEntry6);
       return;					//packet not valid
+    }
   }
   
   }
